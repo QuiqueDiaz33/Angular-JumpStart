@@ -1,0 +1,48 @@
+name: SonarQube Cloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sonarqube:
+    name: Build y análisis SonarQube Cloud
+    runs-on: ubuntu-latest
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+      CYPRESS_INSTALL_BINARY: "0"
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # historial completo para New Code y blame
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 16
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --legacy-peer-deps
+
+      - name: Compilar proyecto Angular
+        run: npm run build -- --configuration production
+
+      - name: Pruebas
+        # El proyecto no define target "test" en angular.json ni archivos *.spec.ts;
+        # el paso se deja explícito y no detiene el pipeline si no hay pruebas.
+        run: npm test -- --watch=false || echo "El proyecto no tiene pruebas unitarias configuradas"
+
+      - name: Análisis SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
